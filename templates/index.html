@@ -486,6 +486,7 @@
                 <input type="text" id="searchInput" placeholder="Search for songs, artists, or albums...">
                 <button onclick="search()">Search</button>
                 <button onclick="clearSearch()">Clear</button>
+                <button onclick="randomizeList()">Randomize List</button>
                 <button id="shuffleBtn" class="shuffle-btn active" onclick="toggleShuffle()">Shuffle: ON</button>
             </div>
             <div class="filters">
@@ -818,6 +819,45 @@
             currentArtist = '';
             currentAlbum = '';
             loadSongs();
+        }
+
+        async function randomizeList() {
+            // Build URL with current filters
+            const params = new URLSearchParams();
+            if (currentDirectory && currentDirectory !== '__LIKED__') {
+                params.append('directory', currentDirectory);
+            } else if (currentArtist) {
+                params.append('artist', currentArtist);
+                if (currentAlbum) {
+                    params.append('album', currentAlbum);
+                }
+            }
+            params.append('limit', 'false'); // Get ALL songs matching criteria
+
+            // Handle liked songs special case
+            let url;
+            if (currentDirectory === '__LIKED__') {
+                url = '/api/liked-songs';
+            } else {
+                url = `/api/songs?${params.toString()}`;
+            }
+
+            const response = await fetch(url);
+            let songs = await response.json();
+
+            // Shuffle the array
+            for (let i = songs.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [songs[i], songs[j]] = [songs[j], songs[i]];
+            }
+
+            // Take first 100 from shuffled list
+            allSongs = songs.slice(0, 100);
+
+            // For shuffle playback, use all songs
+            allSongsForShuffle = songs;
+
+            displaySongs(allSongs);
         }
 
         function displaySongs(songs) {
