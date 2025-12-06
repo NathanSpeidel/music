@@ -597,6 +597,8 @@
         let currentView = 'player';  // 'player' or 'stats'
         let songStartTime = 0;
         let currentSongDuration = 0;
+        let playHistory = [];  // Track last 10 played songs
+        let historyPosition = -1;  // Current position in history (-1 = not navigating history)
 
         // Load initial data
         async function init() {
@@ -866,7 +868,7 @@
             });
         }
 
-        function playSong(song) {
+        function playSong(song, isHistoryNavigation = false) {
             // Track previous song before switching
             if (currentSongId) {
                 trackPlay();
@@ -875,6 +877,23 @@
             currentSongId = song.id;
             currentSongDuration = song.duration;
             songStartTime = Date.now();
+
+            // Add to history if not navigating through history
+            if (!isHistoryNavigation) {
+                // If we're in the middle of history, remove everything after current position
+                if (historyPosition >= 0 && historyPosition < playHistory.length - 1) {
+                    playHistory = playHistory.slice(0, historyPosition + 1);
+                }
+
+                playHistory.push(song);
+
+                // Keep only last 10 songs
+                if (playHistory.length > 10) {
+                    playHistory.shift();
+                }
+
+                historyPosition = playHistory.length - 1;
+            }
 
             const player = document.getElementById('audioPlayer');
             player.src = `/api/stream/${song.id}`;
@@ -1023,6 +1042,17 @@
         function playNext() {
             if (allSongs.length === 0) return;
 
+            // Check if we can go forward in history
+            if (historyPosition >= 0 && historyPosition < playHistory.length - 1) {
+                // Go forward in history
+                historyPosition++;
+                playSong(playHistory[historyPosition], true);
+                return;
+            }
+
+            // Reset history position when playing new song
+            historyPosition = -1;
+
             if (shuffleMode) {
                 // Play random song from full filtered list
                 const randomSong = getRandomSong();
@@ -1047,14 +1077,16 @@
         function playPrevious() {
             if (allSongs.length === 0) return;
 
-            if (shuffleMode) {
-                // Play random song from full filtered list
-                const randomSong = getRandomSong();
-                if (randomSong) {
-                    playSong(randomSong);
-                }
-            } else {
-                // Play previous song in displayed list
+            // Go back in history if available
+            if (historyPosition > 0) {
+                historyPosition--;
+                playSong(playHistory[historyPosition], true);
+            } else if (historyPosition === -1 && playHistory.length > 1) {
+                // Start navigating history from second-to-last song
+                historyPosition = playHistory.length - 2;
+                playSong(playHistory[historyPosition], true);
+            } else if (!shuffleMode) {
+                // No history, fall back to sequential previous
                 const currentIndex = allSongs.findIndex(s => s.id === currentSongId);
                 if (currentIndex > 0) {
                     playSong(allSongs[currentIndex - 1]);
