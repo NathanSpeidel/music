@@ -39,6 +39,41 @@
             margin-bottom: 10px;
         }
 
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .tab {
+            padding: 15px 30px;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-size: 16px;
+            font-weight: 600;
+            color: #6c757d;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            color: #495057;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
         .controls {
             padding: 20px 30px;
             background: #f8f9fa;
@@ -239,12 +274,93 @@
             color: #6c757d;
         }
 
-        .stats {
+        .header-stats {
             text-align: center;
             padding: 10px;
             background: rgba(255,255,255,0.1);
             color: rgba(255,255,255,0.8);
             font-size: 0.9em;
+        }
+
+        .stats-container {
+            padding: 30px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .stats-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .stats-section h2 {
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+
+        .overall-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .stats-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .stats-table td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .stats-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #dee2e6;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
         }
     </style>
 </head>
@@ -252,9 +368,15 @@
     <div class="container">
         <header>
             <h1>Music Player</h1>
-            <div class="stats" id="stats">Loading...</div>
+            <div class="header-stats" id="headerStats">Loading...</div>
         </header>
 
+        <div class="tabs">
+            <button class="tab active" onclick="switchView('player')">Player</button>
+            <button class="tab" onclick="switchView('stats')">Statistics</button>
+        </div>
+
+        <div id="playerView" class="view active">
         <div class="controls">
             <div class="search-box">
                 <input type="text" id="searchInput" placeholder="Search for songs, artists, or albums...">
@@ -290,15 +412,82 @@
                 <button class="control-btn" id="nextBtn" onclick="playNext()" title="Next">&#9197;</button>
             </div>
         </div>
+        </div>
+
+        <div id="statsView" class="view">
+            <div class="stats-container">
+                <div class="stats-section">
+                    <h2>Overall Statistics</h2>
+                    <div class="overall-stats" id="overallStats">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalPlays">0</div>
+                            <div class="stat-label">Total Plays</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalCompleted">0</div>
+                            <div class="stat-label">Completed</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalSkipped">0</div>
+                            <div class="stat-label">Skipped</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="avgPercentage">0%</div>
+                            <div class="stat-label">Avg Listened</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-section">
+                    <h2>Top Songs</h2>
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Song</th>
+                                <th>Artist</th>
+                                <th>Plays</th>
+                                <th>Completed</th>
+                                <th>Completion Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topSongs">
+                            <tr><td colspan="6" style="text-align: center; padding: 40px;">No listening history yet. Start playing some music!</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="stats-section">
+                    <h2>Top Artists</h2>
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Artist</th>
+                                <th>Plays</th>
+                                <th>Completed</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topArtists">
+                            <tr><td colspan="4" style="text-align: center; padding: 40px;">No listening history yet. Start playing some music!</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         let currentSongId = null;
-        let allSongs = [];
+        let allSongs = [];  // For display (limited)
+        let allSongsForShuffle = [];  // Full list for shuffle
         let currentDirectory = '';
         let currentArtist = '';
         let currentAlbum = '';
         let shuffleMode = false;
+        let currentView = 'player';  // 'player' or 'stats'
+        let songStartTime = 0;
+        let currentSongDuration = 0;
 
         // Load initial data
         async function init() {
@@ -394,17 +583,30 @@
                 url += '?' + params.toString();
             }
 
+            // Load display songs (with limit)
             const response = await fetch(url);
             allSongs = await response.json();
             displaySongs(allSongs);
+
+            // Load full list for shuffle (no limit)
+            const shuffleParams = new URLSearchParams(params);
+            shuffleParams.append('limit', 'false');
+            const shuffleUrl = url.includes('?') ? url + '&limit=false' : url + '?limit=false';
+            const shuffleResponse = await fetch(shuffleUrl);
+            allSongsForShuffle = await shuffleResponse.json();
         }
 
         async function search() {
             const searchTerm = document.getElementById('searchInput').value;
             if (searchTerm.trim()) {
+                // Load display songs
                 const response = await fetch(`/api/songs?search=${encodeURIComponent(searchTerm)}`);
                 allSongs = await response.json();
                 displaySongs(allSongs);
+
+                // Load full list for shuffle
+                const shuffleResponse = await fetch(`/api/songs?search=${encodeURIComponent(searchTerm)}&limit=false`);
+                allSongsForShuffle = await shuffleResponse.json();
             }
         }
 
@@ -456,7 +658,15 @@
         }
 
         function playSong(song) {
+            // Track previous song before switching
+            if (currentSongId) {
+                trackPlay();
+            }
+
             currentSongId = song.id;
+            currentSongDuration = song.duration;
+            songStartTime = Date.now();
+
             const player = document.getElementById('audioPlayer');
             player.src = `/api/stream/${song.id}`;
             player.play();
@@ -469,10 +679,99 @@
             displaySongs(allSongs);
         }
 
+        async function trackPlay() {
+            if (!currentSongId) return;
+
+            const durationPlayed = Math.floor((Date.now() - songStartTime) / 1000);
+
+            await fetch('/api/track-play', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    song_id: currentSongId,
+                    duration_played: durationPlayed,
+                    song_duration: currentSongDuration
+                })
+            });
+        }
+
         async function updateStats() {
             const response = await fetch('/api/songs');
             const songs = await response.json();
-            document.getElementById('stats').textContent = `${songs.length} songs in library`;
+            document.getElementById('headerStats').textContent = `${songs.length} songs in library`;
+        }
+
+        function switchView(view) {
+            // Update tabs
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update views
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(view + 'View').classList.add('active');
+
+            currentView = view;
+
+            if (view === 'stats') {
+                loadStatistics();
+            }
+        }
+
+        async function loadStatistics() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+
+                // Update overall stats
+                const overall = data.overall || {};
+                document.getElementById('totalPlays').textContent = overall.total_plays || 0;
+                document.getElementById('totalCompleted').textContent = overall.total_completed || 0;
+                document.getElementById('totalSkipped').textContent = overall.total_skipped || 0;
+                document.getElementById('avgPercentage').textContent =
+                    overall.avg_percentage ? Math.round(overall.avg_percentage) + '%' : '0%';
+
+                // Update top songs
+                const topSongsBody = document.getElementById('topSongs');
+                if (data.top_songs && data.top_songs.length > 0) {
+                    topSongsBody.innerHTML = data.top_songs.map((song, index) => {
+                        const completionRate = song.play_count > 0
+                            ? Math.round((song.completed_count / song.play_count) * 100)
+                            : 0;
+                        return `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td>${escapeHtml(song.title)}</td>
+                                <td>${escapeHtml(song.artist)}</td>
+                                <td>${song.play_count}</td>
+                                <td>${song.completed_count}</td>
+                                <td>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: ${completionRate}%"></div>
+                                    </div>
+                                    ${completionRate}%
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+
+                // Update top artists
+                const topArtistsBody = document.getElementById('topArtists');
+                if (data.top_artists && data.top_artists.length > 0) {
+                    topArtistsBody.innerHTML = data.top_artists.map((artist, index) => `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${escapeHtml(artist.artist)}</td>
+                            <td>${artist.play_count}</td>
+                            <td>${artist.completed_count}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading statistics:', error);
+            }
         }
 
         function formatDuration(seconds) {
@@ -502,22 +801,24 @@
         }
 
         function getRandomSong() {
-            if (allSongs.length === 0) return null;
-            const randomIndex = Math.floor(Math.random() * allSongs.length);
-            return allSongs[randomIndex];
+            // Use full shuffle list, fallback to display list
+            const songList = allSongsForShuffle.length > 0 ? allSongsForShuffle : allSongs;
+            if (songList.length === 0) return null;
+            const randomIndex = Math.floor(Math.random() * songList.length);
+            return songList[randomIndex];
         }
 
         function playNext() {
             if (allSongs.length === 0) return;
 
             if (shuffleMode) {
-                // Play random song
+                // Play random song from full filtered list
                 const randomSong = getRandomSong();
                 if (randomSong) {
                     playSong(randomSong);
                 }
             } else {
-                // Play next song in list
+                // Play next song in displayed list
                 const currentIndex = allSongs.findIndex(s => s.id === currentSongId);
                 if (currentIndex >= 0 && currentIndex < allSongs.length - 1) {
                     playSong(allSongs[currentIndex + 1]);
@@ -535,13 +836,13 @@
             if (allSongs.length === 0) return;
 
             if (shuffleMode) {
-                // Play random song
+                // Play random song from full filtered list
                 const randomSong = getRandomSong();
                 if (randomSong) {
                     playSong(randomSong);
                 }
             } else {
-                // Play previous song in list
+                // Play previous song in displayed list
                 const currentIndex = allSongs.findIndex(s => s.id === currentSongId);
                 if (currentIndex > 0) {
                     playSong(allSongs[currentIndex - 1]);
@@ -576,6 +877,13 @@
                 if (currentIndex >= 0 && currentIndex < allSongs.length - 1) {
                     playSong(allSongs[currentIndex + 1]);
                 }
+            }
+        });
+
+        // Track when page is about to close
+        window.addEventListener('beforeunload', () => {
+            if (currentSongId) {
+                trackPlay();
             }
         });
 

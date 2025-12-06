@@ -27,6 +27,18 @@ def init_db():
             directory TEXT
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS listening_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            song_id INTEGER,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            duration_played INTEGER,
+            song_duration INTEGER,
+            percentage_played REAL,
+            completed BOOLEAN,
+            FOREIGN KEY (song_id) REFERENCES songs(id)
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -155,6 +167,7 @@ def get_songs():
     album = request.args.get('album')
     directory = request.args.get('directory')
     search = request.args.get('search')
+    limit = request.args.get('limit', 'true').lower() == 'true'  # Default to limiting
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -190,12 +203,14 @@ def get_songs():
             ORDER BY album, title
         ''', (artist,))
     else:
-        c.execute('''
+        query = '''
             SELECT id, title, artist, album, filepath, duration
             FROM songs
             ORDER BY artist, album, title
-            LIMIT 100
-        ''')
+        '''
+        if limit:
+            query += ' LIMIT 100'
+        c.execute(query)
 
     songs = []
     for row in c.fetchall():
@@ -223,6 +238,92 @@ def stream_song(song_id):
     if result:
         return send_file(result[0])
     return "File not found", 404
+
+@app.route('/api/track-play', methods=['POST'])
+def track_play():
+    """Track a song play with listening stats."""
+    data = request.get_json()
+    song_id = data.get('song_id')
+    duration_played = data.get('duration_played', 0)
+    song_duration = data.get('song_duration', 0)
+
+    if not song_id:
+        return jsonify({'error': 'song_id required'}), 400
+
+    # Calculate percentage and completion
+    percentage_played = (duration_played / song_duration * 100) if song_duration > 0 else 0
+    completed = percentage_played >= 90  # Consider 90%+ as completed
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO listening_history
+        (song_id, duration_played, song_duration, percentage_played, completed)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (song_id, duration_played, song_duration, percentage_played, completed))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'status': 'success'})
+
+@app.route('/api/stats')
+def get_stats():
+    """Get listening statistics."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+
+    # Top songs by play count
+    c.execute('''
+        SELECT
+            s.id,
+            s.title,
+            s.artist,
+            s.album,
+            COUNT(h.id) as play_count,
+            SUM(CASE WHEN h.completed = 1 THEN 1 ELSE 0 END) as completed_count,
+            SUM(CASE WHEN h.completed = 0 THEN 1 ELSE 0 END) as skipped_count,
+            AVG(h.percentage_played) as avg_percentage
+        FROM songs s
+        JOIN listening_history h ON s.id = h.song_id
+        GROUP BY s.id
+        ORDER BY play_count DESC
+        LIMIT 50
+    ''')
+    top_songs = [dict(row) for row in c.fetchall()]
+
+    # Overall stats
+    c.execute('''
+        SELECT
+            COUNT(*) as total_plays,
+            SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as total_completed,
+            SUM(CASE WHEN completed = 0 THEN 1 ELSE 0 END) as total_skipped,
+            AVG(percentage_played) as avg_percentage
+        FROM listening_history
+    ''')
+    overall = dict(c.fetchone())
+
+    # Top artists
+    c.execute('''
+        SELECT
+            s.artist,
+            COUNT(h.id) as play_count,
+            SUM(CASE WHEN h.completed = 1 THEN 1 ELSE 0 END) as completed_count
+        FROM songs s
+        JOIN listening_history h ON s.id = h.song_id
+        GROUP BY s.artist
+        ORDER BY play_count DESC
+        LIMIT 20
+    ''')
+    top_artists = [dict(row) for row in c.fetchall()]
+
+    conn.close()
+
+    return jsonify({
+        'top_songs': top_songs,
+        'overall': overall,
+        'top_artists': top_artists
+    })
 
 @app.route('/api/rescan')
 def rescan():
