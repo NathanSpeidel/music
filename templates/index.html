@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid #dee2e6;
+            border-radius: 25px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #764ba2;
+        }
+
+        button.shuffle-btn {
+            background: #28a745;
+        }
+
+        button.shuffle-btn:hover {
+            background: #218838;
+        }
+
+        button.shuffle-btn.active {
+            background: #dc3545;
+        }
+
+        button.shuffle-btn.active:hover {
+            background: #c82333;
+        }
+
+        .filters {
+            display: flex;
+            gap: 10px;
+        }
+
+        select {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid #dee2e6;
+            border-radius: 25px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .song-list {
+            padding: 20px 30px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .song-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .song-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .song-item.playing {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .song-info {
+            flex: 1;
+        }
+
+        .song-title {
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .song-meta {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .song-item.playing .song-meta {
+            color: rgba(255,255,255,0.8);
+        }
+
+        .song-duration {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .player {
+            padding: 20px 30px;
+            background: #212529;
+            color: white;
+        }
+
+        .now-playing {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .now-playing-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .now-playing-artist {
+            color: #adb5bd;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .player-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .control-btn {
+            background: #495057;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+        }
+
+        .control-btn:hover {
+            background: #6c757d;
+        }
+
+        .control-btn:disabled {
+            background: #343a40;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+
+        .empty-state h2 {
+            margin-bottom: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .stats {
+            text-align: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Music Player</h1>
+            <div class="stats" id="stats">Loading...</div>
+        </header>
+
+        <div class="controls">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search for songs, artists, or albums...">
+                <button onclick="search()">Search</button>
+                <button onclick="clearSearch()">Clear</button>
+                <button id="shuffleBtn" class="shuffle-btn" onclick="toggleShuffle()">Shuffle: OFF</button>
+            </div>
+            <div class="filters">
+                <select id="directorySelect" onchange="onDirectoryChange()">
+                    <option value="">All Directories</option>
+                </select>
+                <select id="artistSelect" onchange="onArtistChange()">
+                    <option value="">All Artists</option>
+                </select>
+                <select id="albumSelect" onchange="onAlbumChange()">
+                    <option value="">All Albums</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="song-list" id="songList">
+            <div class="loading">Loading your music library...</div>
+        </div>
+
+        <div class="player">
+            <div class="now-playing" id="nowPlaying">
+                <div class="now-playing-title">No song playing</div>
+                <div class="now-playing-artist">Select a song to start</div>
+            </div>
+            <audio id="audioPlayer" controls></audio>
+            <div class="player-controls">
+                <button class="control-btn" id="prevBtn" onclick="playPrevious()" title="Previous">&#9198;</button>
+                <button class="control-btn" id="nextBtn" onclick="playNext()" title="Next">&#9197;</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSongId = null;
+        let allSongs = [];
+        let currentDirectory = '';
+        let currentArtist = '';
+        let currentAlbum = '';
+        let shuffleMode = false;
+
+        // Load initial data
+        async function init() {
+            await loadDirectories();
+            await loadArtists();
+            await loadSongs();
+            updateStats();
+        }
+
+        async function loadDirectories() {
+            const response = await fetch('/api/directories');
+            const directories = await response.json();
+            const select = document.getElementById('directorySelect');
+            select.innerHTML = '<option value="">All Directories</option>';
+            directories.forEach(directory => {
+                const option = document.createElement('option');
+                option.value = directory;
+                option.textContent = directory;
+                select.appendChild(option);
+            });
+        }
+
+        async function loadArtists() {
+            const response = await fetch('/api/artists');
+            const artists = await response.json();
+            const select = document.getElementById('artistSelect');
+            select.innerHTML = '<option value="">All Artists</option>';
+            artists.forEach(artist => {
+                const option = document.createElement('option');
+                option.value = artist;
+                option.textContent = artist;
+                select.appendChild(option);
+            });
+        }
+
+        async function onDirectoryChange() {
+            const directory = document.getElementById('directorySelect').value;
+            currentDirectory = directory;
+
+            // Clear artist and album when directory is selected
+            if (directory) {
+                currentArtist = '';
+                currentAlbum = '';
+                document.getElementById('artistSelect').value = '';
+                document.getElementById('albumSelect').value = '';
+            }
+
+            await loadSongs();
+        }
+
+        async function onArtistChange() {
+            const artist = document.getElementById('artistSelect').value;
+            currentArtist = artist;
+            currentAlbum = '';
+
+            // Clear directory when artist is selected
+            if (artist) {
+                currentDirectory = '';
+                document.getElementById('directorySelect').value = '';
+            }
+
+            const albumSelect = document.getElementById('albumSelect');
+            albumSelect.innerHTML = '<option value="">All Albums</option>';
+
+            if (artist) {
+                const response = await fetch(`/api/albums?artist=${encodeURIComponent(artist)}`);
+                const albums = await response.json();
+                albums.forEach(album => {
+                    const option = document.createElement('option');
+                    option.value = album;
+                    option.textContent = album;
+                    albumSelect.appendChild(option);
+                });
+            }
+
+            await loadSongs();
+        }
+
+        async function onAlbumChange() {
+            currentAlbum = document.getElementById('albumSelect').value;
+            await loadSongs();
+        }
+
+        async function loadSongs() {
+            let url = '/api/songs';
+            const params = new URLSearchParams();
+
+            if (currentDirectory) params.append('directory', currentDirectory);
+            if (currentArtist) params.append('artist', currentArtist);
+            if (currentAlbum) params.append('album', currentAlbum);
+
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+
+            const response = await fetch(url);
+            allSongs = await response.json();
+            displaySongs(allSongs);
+        }
+
+        async function search() {
+            const searchTerm = document.getElementById('searchInput').value;
+            if (searchTerm.trim()) {
+                const response = await fetch(`/api/songs?search=${encodeURIComponent(searchTerm)}`);
+                allSongs = await response.json();
+                displaySongs(allSongs);
+            }
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('directorySelect').value = '';
+            document.getElementById('artistSelect').value = '';
+            document.getElementById('albumSelect').value = '';
+            currentDirectory = '';
+            currentArtist = '';
+            currentAlbum = '';
+            loadSongs();
+        }
+
+        function displaySongs(songs) {
+            const songList = document.getElementById('songList');
+
+            if (songs.length === 0) {
+                songList.innerHTML = `
+                    <div class="empty-state">
+                        <h2>No songs found</h2>
+                        <p>Try a different search or browse by artist</p>
+                    </div>
+                `;
+                return;
+            }
+
+            songList.innerHTML = '';
+            songs.forEach(song => {
+                const div = document.createElement('div');
+                div.className = 'song-item';
+                if (song.id === currentSongId) {
+                    div.classList.add('playing');
+                }
+
+                const duration = formatDuration(song.duration);
+
+                div.innerHTML = `
+                    <div class="song-info">
+                        <div class="song-title">${escapeHtml(song.title)}</div>
+                        <div class="song-meta">${escapeHtml(song.artist)} - ${escapeHtml(song.album)}</div>
+                    </div>
+                    <div class="song-duration">${duration}</div>
+                `;
+
+                div.onclick = () => playSong(song);
+                songList.appendChild(div);
+            });
+        }
+
+        function playSong(song) {
+            currentSongId = song.id;
+            const player = document.getElementById('audioPlayer');
+            player.src = `/api/stream/${song.id}`;
+            player.play();
+
+            document.getElementById('nowPlaying').innerHTML = `
+                <div class="now-playing-title">${escapeHtml(song.title)}</div>
+                <div class="now-playing-artist">${escapeHtml(song.artist)} - ${escapeHtml(song.album)}</div>
+            `;
+
+            displaySongs(allSongs);
+        }
+
+        async function updateStats() {
+            const response = await fetch('/api/songs');
+            const songs = await response.json();
+            document.getElementById('stats').textContent = `${songs.length} songs in library`;
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds) return '--:--';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function toggleShuffle() {
+            shuffleMode = !shuffleMode;
+            const btn = document.getElementById('shuffleBtn');
+
+            if (shuffleMode) {
+                btn.textContent = 'Shuffle: ON';
+                btn.classList.add('active');
+            } else {
+                btn.textContent = 'Shuffle: OFF';
+                btn.classList.remove('active');
+            }
+        }
+
+        function getRandomSong() {
+            if (allSongs.length === 0) return null;
+            const randomIndex = Math.floor(Math.random() * allSongs.length);
+            return allSongs[randomIndex];
+        }
+
+        function playNext() {
+            if (allSongs.length === 0) return;
+
+            if (shuffleMode) {
+                // Play random song
+                const randomSong = getRandomSong();
+                if (randomSong) {
+                    playSong(randomSong);
+                }
+            } else {
+                // Play next song in list
+                const currentIndex = allSongs.findIndex(s => s.id === currentSongId);
+                if (currentIndex >= 0 && currentIndex < allSongs.length - 1) {
+                    playSong(allSongs[currentIndex + 1]);
+                } else if (currentIndex === allSongs.length - 1) {
+                    // Loop back to first song
+                    playSong(allSongs[0]);
+                } else if (allSongs.length > 0) {
+                    // No current song, play first
+                    playSong(allSongs[0]);
+                }
+            }
+        }
+
+        function playPrevious() {
+            if (allSongs.length === 0) return;
+
+            if (shuffleMode) {
+                // Play random song
+                const randomSong = getRandomSong();
+                if (randomSong) {
+                    playSong(randomSong);
+                }
+            } else {
+                // Play previous song in list
+                const currentIndex = allSongs.findIndex(s => s.id === currentSongId);
+                if (currentIndex > 0) {
+                    playSong(allSongs[currentIndex - 1]);
+                } else if (currentIndex === 0) {
+                    // Loop back to last song
+                    playSong(allSongs[allSongs.length - 1]);
+                } else if (allSongs.length > 0) {
+                    // No current song, play last
+                    playSong(allSongs[allSongs.length - 1]);
+                }
+            }
+        }
+
+        // Allow enter key to search
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                search();
+            }
+        });
+
+        // Auto-play next song
+        document.getElementById('audioPlayer').addEventListener('ended', () => {
+            if (shuffleMode) {
+                // Play random song (allows repeats)
+                const randomSong = getRandomSong();
+                if (randomSong) {
+                    playSong(randomSong);
+                }
+            } else {
+                // Play next song in order
+                const currentIndex = allSongs.findIndex(s => s.id === currentSongId);
+                if (currentIndex >= 0 && currentIndex < allSongs.length - 1) {
+                    playSong(allSongs[currentIndex + 1]);
+                }
+            }
+        });
+
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>
