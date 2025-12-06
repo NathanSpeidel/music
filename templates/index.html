@@ -30,19 +30,26 @@
         header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 30px;
+            padding: 15px 30px;
             text-align: center;
         }
 
         h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+            font-size: 1.5em;
+            margin: 0;
         }
 
         .tabs {
             display: flex;
+            justify-content: space-between;
+            align-items: center;
             background: #f8f9fa;
             border-bottom: 2px solid #dee2e6;
+            padding-right: 20px;
+        }
+
+        .tab-buttons {
+            display: flex;
         }
 
         .tab {
@@ -54,6 +61,12 @@
             font-weight: 600;
             color: #6c757d;
             transition: all 0.3s;
+        }
+
+        .header-stats {
+            font-size: 14px;
+            color: #6c757d;
+            font-weight: 500;
         }
 
         .tab:hover {
@@ -135,16 +148,37 @@
         .filters {
             display: flex;
             gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
         select {
-            flex: 1;
+            flex: 0 1 auto;
+            min-width: 180px;
             padding: 12px 20px;
             border: 2px solid #dee2e6;
             border-radius: 25px;
             font-size: 16px;
             background: white;
             cursor: pointer;
+        }
+
+        .liked-filter-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: #f8f9fa;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            white-space: nowrap;
+        }
+
+        .liked-filter-checkbox input[type="checkbox"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
         }
 
         .song-list {
@@ -199,6 +233,30 @@
             font-size: 0.9em;
         }
 
+        .song-meta-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .like-btn {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 5px 10px;
+            transition: transform 0.2s;
+            color: #dee2e6;
+        }
+
+        .like-btn:hover {
+            transform: scale(1.2);
+        }
+
+        .like-btn.liked {
+            color: #dc3545;
+        }
+
         .player {
             padding: 20px 30px;
             background: #212529;
@@ -208,6 +266,7 @@
         .now-playing {
             margin-bottom: 15px;
             text-align: center;
+            position: relative;
         }
 
         .now-playing-title {
@@ -218,6 +277,29 @@
 
         .now-playing-artist {
             color: #adb5bd;
+        }
+
+        .now-playing-like {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px 10px;
+            opacity: 0.5;
+            transition: opacity 0.3s;
+        }
+
+        .now-playing-like:hover {
+            opacity: 0.8;
+        }
+
+        .now-playing-like.liked {
+            opacity: 1;
+            color: #e74c3c;
         }
 
         audio {
@@ -368,12 +450,14 @@
     <div class="container">
         <header>
             <h1>Music Player</h1>
-            <div class="header-stats" id="headerStats">Loading...</div>
         </header>
 
         <div class="tabs">
-            <button class="tab active" onclick="switchView('player')">Player</button>
-            <button class="tab" onclick="switchView('stats')">Statistics</button>
+            <div class="tab-buttons">
+                <button class="tab active" onclick="switchView('player')">Player</button>
+                <button class="tab" onclick="switchView('stats')">Statistics</button>
+            </div>
+            <div class="header-stats" id="headerStats">Loading...</div>
         </div>
 
         <div id="playerView" class="view active">
@@ -382,11 +466,12 @@
                 <input type="text" id="searchInput" placeholder="Search for songs, artists, or albums...">
                 <button onclick="search()">Search</button>
                 <button onclick="clearSearch()">Clear</button>
-                <button id="shuffleBtn" class="shuffle-btn" onclick="toggleShuffle()">Shuffle: OFF</button>
+                <button id="shuffleBtn" class="shuffle-btn active" onclick="toggleShuffle()">Shuffle: ON</button>
             </div>
             <div class="filters">
                 <select id="directorySelect" onchange="onDirectoryChange()">
                     <option value="">All Directories</option>
+                    <option value="__LIKED__">❤️ Liked Songs</option>
                 </select>
                 <select id="artistSelect" onchange="onArtistChange()">
                     <option value="">All Artists</option>
@@ -394,6 +479,10 @@
                 <select id="albumSelect" onchange="onAlbumChange()">
                     <option value="">All Albums</option>
                 </select>
+                <label class="liked-filter-checkbox">
+                    <input type="checkbox" id="showOnlyLiked" onchange="onLikedFilterChange()">
+                    Show only liked songs
+                </label>
             </div>
         </div>
 
@@ -484,7 +573,7 @@
         let currentDirectory = '';
         let currentArtist = '';
         let currentAlbum = '';
-        let shuffleMode = false;
+        let shuffleMode = true;
         let currentView = 'player';  // 'player' or 'stats'
         let songStartTime = 0;
         let currentSongDuration = 0;
@@ -571,7 +660,41 @@
             await loadSongs();
         }
 
+        async function onLikedFilterChange() {
+            const showOnlyLiked = document.getElementById('showOnlyLiked').checked;
+            if (showOnlyLiked) {
+                // Load ALL songs to properly filter liked ones
+                const params = new URLSearchParams();
+                if (currentDirectory && currentDirectory !== '__LIKED__') {
+                    params.append('directory', currentDirectory);
+                } else if (currentArtist) {
+                    params.append('artist', currentArtist);
+                    if (currentAlbum) {
+                        params.append('album', currentAlbum);
+                    }
+                }
+                params.append('limit', 'false'); // Get ALL songs
+
+                const url = `/api/songs?${params.toString()}`;
+                const response = await fetch(url);
+                allSongs = await response.json();
+                displaySongs(allSongs);
+            } else {
+                // Just refresh the display with the current songs
+                displaySongs(allSongs);
+            }
+        }
+
         async function loadSongs() {
+            // Handle liked songs special case
+            if (currentDirectory === '__LIKED__') {
+                const response = await fetch('/api/liked-songs');
+                allSongs = await response.json();
+                allSongsForShuffle = allSongs;
+                displaySongs(allSongs);
+                return;
+            }
+
             let url = '/api/songs';
             const params = new URLSearchParams();
 
@@ -594,6 +717,60 @@
             const shuffleUrl = url.includes('?') ? url + '&limit=false' : url + '?limit=false';
             const shuffleResponse = await fetch(shuffleUrl);
             allSongsForShuffle = await shuffleResponse.json();
+        }
+
+        async function toggleLike(songId, button) {
+            const isLiked = button.classList.contains('liked');
+
+            if (isLiked) {
+                await fetch(`/api/unlike/${songId}`, { method: 'POST' });
+                button.classList.remove('liked');
+                button.title = 'Like';
+            } else {
+                await fetch(`/api/like/${songId}`, { method: 'POST' });
+                button.classList.add('liked');
+                button.title = 'Unlike';
+            }
+
+            // Refresh if viewing liked songs
+            if (currentDirectory === '__LIKED__') {
+                await loadSongs();
+            }
+        }
+
+        async function toggleNowPlayingLike() {
+            if (!currentSongId) return;
+
+            const button = document.querySelector('.now-playing-like');
+            const isLiked = button.classList.contains('liked');
+
+            if (isLiked) {
+                await fetch(`/api/unlike/${currentSongId}`, { method: 'POST' });
+                button.classList.remove('liked');
+                button.title = 'Like';
+            } else {
+                await fetch(`/api/like/${currentSongId}`, { method: 'POST' });
+                button.classList.add('liked');
+                button.title = 'Unlike';
+            }
+
+            // Update the song in allSongs array
+            const songIndex = allSongs.findIndex(s => s.id === currentSongId);
+            if (songIndex !== -1) {
+                allSongs[songIndex].liked = !isLiked;
+            }
+            const shuffleIndex = allSongsForShuffle.findIndex(s => s.id === currentSongId);
+            if (shuffleIndex !== -1) {
+                allSongsForShuffle[shuffleIndex].liked = !isLiked;
+            }
+
+            // Refresh display
+            displaySongs(allSongs);
+
+            // Refresh if viewing liked songs
+            if (currentDirectory === '__LIKED__') {
+                await loadSongs();
+            }
         }
 
         async function search() {
@@ -624,7 +801,14 @@
         function displaySongs(songs) {
             const songList = document.getElementById('songList');
 
-            if (songs.length === 0) {
+            // Filter by liked if checkbox is checked
+            const showOnlyLiked = document.getElementById('showOnlyLiked').checked;
+            let displayedSongs = songs;
+            if (showOnlyLiked) {
+                displayedSongs = songs.filter(song => song.liked);
+            }
+
+            if (displayedSongs.length === 0) {
                 songList.innerHTML = `
                     <div class="empty-state">
                         <h2>No songs found</h2>
@@ -635,7 +819,7 @@
             }
 
             songList.innerHTML = '';
-            songs.forEach(song => {
+            displayedSongs.forEach(song => {
                 const div = document.createElement('div');
                 div.className = 'song-item';
                 if (song.id === currentSongId) {
@@ -643,16 +827,21 @@
                 }
 
                 const duration = formatDuration(song.duration);
+                const likedClass = song.liked ? 'liked' : '';
 
                 div.innerHTML = `
-                    <div class="song-info">
+                    <div class="song-info" onclick="playSong(${JSON.stringify(song).replace(/"/g, '&quot;')})">
                         <div class="song-title">${escapeHtml(song.title)}</div>
                         <div class="song-meta">${escapeHtml(song.artist)} - ${escapeHtml(song.album)}</div>
                     </div>
-                    <div class="song-duration">${duration}</div>
+                    <div class="song-meta-container">
+                        <button class="like-btn ${likedClass}" onclick="event.stopPropagation(); toggleLike(${song.id}, this)" title="${song.liked ? 'Unlike' : 'Like'}">
+                            ❤
+                        </button>
+                        <div class="song-duration">${duration}</div>
+                    </div>
                 `;
 
-                div.onclick = () => playSong(song);
                 songList.appendChild(div);
             });
         }
@@ -671,9 +860,12 @@
             player.src = `/api/stream/${song.id}`;
             player.play();
 
+            const likedClass = song.liked ? 'liked' : '';
+            const likedTitle = song.liked ? 'Unlike' : 'Like';
             document.getElementById('nowPlaying').innerHTML = `
                 <div class="now-playing-title">${escapeHtml(song.title)}</div>
                 <div class="now-playing-artist">${escapeHtml(song.artist)} - ${escapeHtml(song.album)}</div>
+                <button class="now-playing-like ${likedClass}" onclick="toggleNowPlayingLike()" title="${likedTitle}">❤</button>
             `;
 
             displaySongs(allSongs);
@@ -698,7 +890,7 @@
         }
 
         async function updateStats() {
-            const response = await fetch('/api/songs');
+            const response = await fetch('/api/songs?limit=false');
             const songs = await response.json();
             document.getElementById('headerStats').textContent = `${songs.length} songs in library`;
         }

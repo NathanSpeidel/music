@@ -39,6 +39,14 @@ def init_db():
             FOREIGN KEY (song_id) REFERENCES songs(id)
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS liked_songs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            song_id INTEGER UNIQUE,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (song_id) REFERENCES songs(id)
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -160,6 +168,58 @@ def get_directories():
     conn.close()
     return jsonify(directories)
 
+@app.route('/api/like/<int:song_id>', methods=['POST'])
+def like_song(song_id):
+    """Like a song."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute('INSERT INTO liked_songs (song_id) VALUES (?)', (song_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'status': 'success', 'liked': True})
+    except sqlite3.IntegrityError:
+        # Already liked
+        conn.close()
+        return jsonify({'status': 'already_liked', 'liked': True})
+
+@app.route('/api/unlike/<int:song_id>', methods=['POST'])
+def unlike_song(song_id):
+    """Unlike a song."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('DELETE FROM liked_songs WHERE song_id = ?', (song_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'success', 'liked': False})
+
+@app.route('/api/liked-songs')
+def get_liked_songs():
+    """Get all liked songs."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        SELECT s.id, s.title, s.artist, s.album, s.filepath, s.duration, l.timestamp
+        FROM songs s
+        JOIN liked_songs l ON s.id = l.song_id
+        ORDER BY l.timestamp DESC
+    ''')
+
+    songs = []
+    for row in c.fetchall():
+        songs.append({
+            'id': row[0],
+            'title': row[1],
+            'artist': row[2],
+            'album': row[3],
+            'filepath': row[4],
+            'duration': row[5],
+            'liked': True
+        })
+
+    conn.close()
+    return jsonify(songs)
+
 @app.route('/api/songs')
 def get_songs():
     """Get songs with optional filters."""
@@ -212,15 +272,22 @@ def get_songs():
             query += ' LIMIT 100'
         c.execute(query)
 
+    songs_data = c.fetchall()
+
+    # Get liked song IDs
+    c.execute('SELECT song_id FROM liked_songs')
+    liked_ids = {row[0] for row in c.fetchall()}
+
     songs = []
-    for row in c.fetchall():
+    for row in songs_data:
         songs.append({
             'id': row[0],
             'title': row[1],
             'artist': row[2],
             'album': row[3],
             'filepath': row[4],
-            'duration': row[5]
+            'duration': row[5],
+            'liked': row[0] in liked_ids
         })
 
     conn.close()
@@ -273,7 +340,7 @@ def get_stats():
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
 
-    # Top songs by play count
+    # Top songs by completion count
     c.execute('''
         SELECT
             s.id,
@@ -287,7 +354,7 @@ def get_stats():
         FROM songs s
         JOIN listening_history h ON s.id = h.song_id
         GROUP BY s.id
-        ORDER BY play_count DESC
+        ORDER BY completed_count DESC
         LIMIT 50
     ''')
     top_songs = [dict(row) for row in c.fetchall()]
