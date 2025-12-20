@@ -511,6 +511,9 @@
                 <button id="shuffleBtn" class="shuffle-btn active" onclick="toggleShuffle()">Shuffle: ON</button>
             </div>
             <div class="filters">
+                <select id="categorySelect" onchange="onCategoryChange()">
+                    <option value="">All Categories</option>
+                </select>
                 <select id="directorySelect" onchange="onDirectoryChange()">
                     <option value="">All Directories</option>
                     <option value="__LIKED__">❤️ Liked Songs</option>
@@ -613,6 +616,7 @@
         let currentSongId = null;
         let allSongs = [];  // For display (limited)
         let allSongsForShuffle = [];  // Full list for shuffle
+        let currentCategory = '';
         let currentDirectory = '';
         let currentArtist = '';
         let currentAlbum = '';
@@ -625,10 +629,24 @@
 
         // Load initial data
         async function init() {
+            await loadCategories();
             await loadDirectories();
             await loadArtists();
             await loadSongs();
             updateStats();
+        }
+
+        async function loadCategories() {
+            const response = await fetch('/api/categories');
+            const categories = await response.json();
+            const select = document.getElementById('categorySelect');
+            select.innerHTML = '<option value="">All Categories</option>';
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = category.name;
+                select.appendChild(option);
+            });
         }
 
         async function loadDirectories() {
@@ -657,14 +675,33 @@
             });
         }
 
+        async function onCategoryChange() {
+            const category = document.getElementById('categorySelect').value;
+            currentCategory = category;
+
+            // Clear other filters when category is selected
+            if (category) {
+                currentDirectory = '';
+                currentArtist = '';
+                currentAlbum = '';
+                document.getElementById('directorySelect').value = '';
+                document.getElementById('artistSelect').value = '';
+                document.getElementById('albumSelect').value = '';
+            }
+
+            await loadSongs();
+        }
+
         async function onDirectoryChange() {
             const directory = document.getElementById('directorySelect').value;
             currentDirectory = directory;
 
-            // Clear artist and album when directory is selected
+            // Clear category, artist and album when directory is selected
             if (directory) {
+                currentCategory = '';
                 currentArtist = '';
                 currentAlbum = '';
+                document.getElementById('categorySelect').value = '';
                 document.getElementById('artistSelect').value = '';
                 document.getElementById('albumSelect').value = '';
             }
@@ -677,9 +714,11 @@
             currentArtist = artist;
             currentAlbum = '';
 
-            // Clear directory when artist is selected
+            // Clear category and directory when artist is selected
             if (artist) {
+                currentCategory = '';
                 currentDirectory = '';
+                document.getElementById('categorySelect').value = '';
                 document.getElementById('directorySelect').value = '';
             }
 
@@ -743,6 +782,7 @@
             let url = '/api/songs';
             const params = new URLSearchParams();
 
+            if (currentCategory) params.append('category', currentCategory);
             if (currentDirectory) params.append('directory', currentDirectory);
             if (currentArtist) params.append('artist', currentArtist);
             if (currentAlbum) params.append('album', currentAlbum);
@@ -834,9 +874,11 @@
 
         function clearSearch() {
             document.getElementById('searchInput').value = '';
+            document.getElementById('categorySelect').value = '';
             document.getElementById('directorySelect').value = '';
             document.getElementById('artistSelect').value = '';
             document.getElementById('albumSelect').value = '';
+            currentCategory = '';
             currentDirectory = '';
             currentArtist = '';
             currentAlbum = '';
@@ -846,7 +888,9 @@
         async function randomizeList() {
             // Build URL with current filters
             const params = new URLSearchParams();
-            if (currentDirectory && currentDirectory !== '__LIKED__') {
+            if (currentCategory) {
+                params.append('category', currentCategory);
+            } else if (currentDirectory && currentDirectory !== '__LIKED__') {
                 params.append('directory', currentDirectory);
             } else if (currentArtist) {
                 params.append('artist', currentArtist);

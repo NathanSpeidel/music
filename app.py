@@ -47,8 +47,65 @@ def init_db():
             FOREIGN KEY (song_id) REFERENCES songs(id)
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE,
+            description TEXT
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS artist_category_mapping (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            artist TEXT,
+            category_id INTEGER,
+            FOREIGN KEY (category_id) REFERENCES categories(id)
+        )
+    ''')
     conn.commit()
     conn.close()
+
+def populate_categories():
+    """Populate categories and artist mappings."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    # Check if categories already exist
+    c.execute('SELECT COUNT(*) FROM categories')
+    if c.fetchone()[0] > 0:
+        conn.close()
+        return  # Categories already populated
+
+    # Define categories and their artist mappings
+    categories_data = [
+        ('Heavy Metal', ['Metallica', 'In Flames', 'Opeth']),
+        ('Alternative Rock', ['Dave Matthews Band', 'Red Hot Chili Peppers', 'Coldplay', 'John Mayer', 'Collective Soul', 'Live']),
+        ('Grunge/90s Rock', ['Pearl Jam', 'Soundgarden', 'Stone Temple Pilots', 'Nirvana', 'Alice in Chains']),
+        ('Folk/Singer-Songwriter', ['Natalie Merchant', '10,000 Maniacs', 'Jewel', 'Tracy Chapman', 'Paul Simon', 'James Taylor', 'Bonnie Raitt']),
+        ('Pop', ['Madonna', 'Mariah Carey', 'Adele', 'Lady Gaga', 'Kelly Clarkson', 'Selena Gomez', 'Christina Perri']),
+        ('Hip Hop/Rap', ['Eminem', '2pac', 'Snoop Dogg', 'Ice Cube', 'Wiz Khalifa']),
+        ('Blues Rock', ['The Black Keys']),
+        ('Reggae', ['Bob Marley & The Wailers;', 'Bob Marley']),
+        ('Classic Rock', ['Guns N\' Roses', 'Pink Floyd', 'U2', 'Foreigner', 'Elton John']),
+        ('Hard Rock', ['Rage Against the Machine', 'Audioslave', 'System of a Down']),
+        ('R&B/Soul', ['Boyz II Men', 'India Arie', 'Norah Jones', 'Corinne Bailey Rae', 'Toni Braxton', 'TLC', 'Janet Jackson']),
+        ('Soundtracks', ['James Horner', 'Trevor Jones and Randy Edelman', 'Walt Disney Pictures', 'Walt Disney', 'Steel Dragon (Rockstar)']),
+        ('Classical', ['Philharmonic Chamber Orchestra', 'Montserrat Caballe']),
+        ('Holiday/Christmas', []),  # Will catch by directory
+        ('Indie/Alternative', ['Beirut', 'Sigur Rós', 'Mumford and Sons', 'The Paper Kites', 'Iron and Wine', 'The Temper Trap', 'Phillip Phillips'])
+    ]
+
+    # Insert categories and artist mappings
+    for category_name, artists in categories_data:
+        c.execute('INSERT INTO categories (name) VALUES (?)', (category_name,))
+        category_id = c.lastrowid
+
+        for artist in artists:
+            c.execute('INSERT INTO artist_category_mapping (artist, category_id) VALUES (?, ?)', (artist, category_id))
+
+    conn.commit()
+    conn.close()
+    print("Categories populated successfully!")
 
 def get_metadata(filepath):
     """Extract metadata from audio file."""
@@ -168,6 +225,16 @@ def get_directories():
     conn.close()
     return jsonify(directories)
 
+@app.route('/api/categories')
+def get_categories():
+    """Get list of all categories."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT id, name FROM categories ORDER BY name')
+    categories = [{'id': row[0], 'name': row[1]} for row in c.fetchall()]
+    conn.close()
+    return jsonify(categories)
+
 @app.route('/api/like/<int:song_id>', methods=['POST'])
 def like_song(song_id):
     """Like a song."""
@@ -227,6 +294,7 @@ def get_songs():
     album = request.args.get('album')
     directory = request.args.get('directory')
     search = request.args.get('search')
+    category = request.args.get('category')
     limit = request.args.get('limit', 'true').lower() == 'true'  # Default to limiting
 
     conn = sqlite3.connect(DB_PATH)
@@ -241,6 +309,14 @@ def get_songs():
         '''
         search_term = f'%{search}%'
         c.execute(query, (search_term, search_term, search_term))
+    elif category:
+        c.execute('''
+            SELECT DISTINCT s.id, s.title, s.artist, s.album, s.filepath, s.duration
+            FROM songs s
+            JOIN artist_category_mapping acm ON s.artist = acm.artist
+            WHERE acm.category_id = ?
+            ORDER BY s.artist, s.album, s.title
+        ''', (category,))
     elif directory:
         c.execute('''
             SELECT id, title, artist, album, filepath, duration
@@ -400,6 +476,7 @@ def rescan():
 
 if __name__ == '__main__':
     init_db()
+    populate_categories()
 
     # Check if database is empty and scan if needed
     conn = sqlite3.connect(DB_PATH)
