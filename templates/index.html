@@ -540,6 +540,7 @@
             <audio id="audioPlayer" controls></audio>
             <div class="player-controls">
                 <button class="control-btn" id="prevBtn" onclick="playPrevious()" title="Previous">&#9198;</button>
+                <button class="control-btn" id="playPauseBtn" onclick="togglePlayPause()" title="Play/Pause">&#9654;</button>
                 <button class="control-btn" id="nextBtn" onclick="playNext()" title="Next">&#9197;</button>
             </div>
         </div>
@@ -1105,6 +1106,30 @@
             }
         }
 
+        function togglePlayPause() {
+            const player = document.getElementById('audioPlayer');
+            const btn = document.getElementById('playPauseBtn');
+
+            if (player.paused) {
+                player.play();
+                btn.innerHTML = '&#9208;'; // Pause symbol
+            } else {
+                player.pause();
+                btn.innerHTML = '&#9654;'; // Play symbol
+            }
+        }
+
+        function updatePlayPauseButton() {
+            const player = document.getElementById('audioPlayer');
+            const btn = document.getElementById('playPauseBtn');
+
+            if (player.paused) {
+                btn.innerHTML = '&#9654;'; // Play symbol
+            } else {
+                btn.innerHTML = '&#9208;'; // Pause symbol
+            }
+        }
+
         function getRandomSong() {
             // Use full shuffle list, fallback to display list
             const songList = allSongsForShuffle.length > 0 ? allSongsForShuffle : allSongs;
@@ -1220,6 +1245,10 @@
                 }
             }
         });
+
+        // Update play/pause button when audio state changes
+        document.getElementById('audioPlayer').addEventListener('play', updatePlayPauseButton);
+        document.getElementById('audioPlayer').addEventListener('pause', updatePlayPauseButton);
 
         // Track when page is about to close
         window.addEventListener('beforeunload', () => {
