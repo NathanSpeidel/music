@@ -1161,9 +1161,32 @@
             }
         }
 
-        // Allow enter key to search
+        // Auto-search as user types (with debounce)
+        let searchTimeout = null;
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            // Clear previous timeout
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+
+            // Set new timeout to search after 300ms of no typing
+            searchTimeout = setTimeout(() => {
+                const searchTerm = e.target.value.trim();
+                if (searchTerm) {
+                    search();
+                } else {
+                    // If search box is empty, reload default songs
+                    loadSongs();
+                }
+            }, 300);
+        });
+
+        // Also allow enter key to search immediately
         document.getElementById('searchInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
+                if (searchTimeout) {
+                    clearTimeout(searchTimeout);
+                }
                 search();
             }
         });
