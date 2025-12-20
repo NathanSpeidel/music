@@ -968,6 +968,19 @@
                 <button class="now-playing-like ${likedClass}" onclick="toggleNowPlayingLike()" title="${likedTitle}">❤</button>
             `;
 
+            // Update MediaSession metadata for hardware controls
+            if ('mediaSession' in navigator && 'MediaMetadata' in window) {
+                try {
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: song.title,
+                        artist: song.artist,
+                        album: song.album
+                    });
+                } catch (e) {
+                    console.log('MediaSession not fully supported:', e);
+                }
+            }
+
             displaySongs(allSongs);
         }
 
@@ -1214,6 +1227,31 @@
                 trackPlay();
             }
         });
+
+        // Setup MediaSession API for hardware media controls
+        if ('mediaSession' in navigator) {
+            try {
+                navigator.mediaSession.setActionHandler('play', () => {
+                    const player = document.getElementById('audioPlayer');
+                    if (player) player.play();
+                });
+
+                navigator.mediaSession.setActionHandler('pause', () => {
+                    const player = document.getElementById('audioPlayer');
+                    if (player) player.pause();
+                });
+
+                navigator.mediaSession.setActionHandler('nexttrack', () => {
+                    playNext();
+                });
+
+                navigator.mediaSession.setActionHandler('previoustrack', () => {
+                    playPrevious();
+                });
+            } catch (e) {
+                console.log('MediaSession action handlers not fully supported:', e);
+            }
+        }
 
         // Initialize on load
         init();
