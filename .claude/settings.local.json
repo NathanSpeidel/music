@@ -3,7 +3,9 @@
     "allow": [
       "Bash(pip3 install:*)",
       "Bash(python3:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(ipconfig getifaddr:*)",
+      "Bash(lsof:*)"
     ],
     "deny": [],
     "ask": []
