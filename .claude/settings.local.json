@@ -6,7 +6,8 @@
       "Bash(curl:*)",
       "Bash(ipconfig getifaddr:*)",
       "Bash(lsof:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(python app.py:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,7 +1,8 @@
 import os
+import re
 import sqlite3
 from pathlib import Path
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, send_file, jsonify, Response
 from mutagen import File as MutagenFile
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4
@@ -371,16 +372,60 @@ def get_songs():
 
 @app.route('/api/stream/<int:song_id>')
 def stream_song(song_id):
-    """Stream a song file."""
+    """Stream a song file with range request support."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('SELECT filepath FROM songs WHERE id = ?', (song_id,))
     result = c.fetchone()
     conn.close()
 
-    if result:
-        return send_file(result[0])
-    return "File not found", 404
+    if not result:
+        return "Song not found", 404
+
+    filepath = result[0]
+    if not os.path.exists(filepath):
+        return "File not found on disk", 404
+
+    file_size = os.path.getsize(filepath)
+
+    mime_types = {
+        '.mp3': 'audio/mpeg',
+        '.m4a': 'audio/mp4',
+        '.flac': 'audio/flac',
+        '.wav': 'audio/wav',
+        '.ogg': 'audio/ogg',
+    }
+    ext = os.path.splitext(filepath)[1].lower()
+    mime_type = mime_types.get(ext, 'audio/mpeg')
+
+    range_header = request.headers.get('Range')
+    if range_header:
+        match = re.search(r'bytes=(\d+)-(\d*)', range_header)
+        byte_start = int(match.group(1)) if match else 0
+        byte_end = int(match.group(2)) if match and match.group(2) else file_size - 1
+        length = byte_end - byte_start + 1
+
+        def generate():
+            with open(filepath, 'rb') as f:
+                f.seek(byte_start)
+                remaining = length
+                while remaining > 0:
+                    chunk = f.read(min(8192, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+
+        resp = Response(generate(), status=206, mimetype=mime_type)
+        resp.headers['Content-Range'] = f'bytes {byte_start}-{byte_end}/{file_size}'
+        resp.headers['Accept-Ranges'] = 'bytes'
+        resp.headers['Content-Length'] = length
+        return resp
+
+    resp = Response(open(filepath, 'rb'), status=200, mimetype=mime_type)
+    resp.headers['Accept-Ranges'] = 'bytes'
+    resp.headers['Content-Length'] = file_size
+    return resp
 
 @app.route('/api/track-play', methods=['POST'])
 def track_play():
